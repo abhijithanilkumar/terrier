@@ -45,7 +45,8 @@ void DataTable::Scan(const common::ManagedPointer<transaction::TransactionContex
   // but can be improved if block is read-only, or if we implement version synopsis, to just use std::memcpy when it's
   // safe
   uint32_t filled = 0;
-  while (filled < out_buffer->MaxTuples() && *start_pos != end()) {
+  auto end_iter = end();
+  while (filled < out_buffer->MaxTuples() && *start_pos != end_iter) {
     ProjectedColumns::RowView row = out_buffer->InterpretAsRow(filled);
     const TupleSlot slot = **start_pos;
     // Only fill the buffer with valid, visible tuples
@@ -59,7 +60,6 @@ void DataTable::Scan(const common::ManagedPointer<transaction::TransactionContex
 }
 
 DataTable::SlotIterator &DataTable::SlotIterator::operator++() {
-  common::SpinLatch::ScopedSpinLatch guard(&table_->blocks_latch_);
   // Jump to the next block if already the last slot in the block.
   if (current_slot_.GetOffset() == table_->accessor_.GetBlockLayout().NumSlots() - 1) {
     ++block_;
@@ -72,7 +72,6 @@ DataTable::SlotIterator &DataTable::SlotIterator::operator++() {
 }
 
 DataTable::SlotIterator DataTable::end() const {  // NOLINT for STL name compability
-  common::SpinLatch::ScopedSpinLatch guard(&blocks_latch_);
   // TODO(Tianyu): Need to look in detail at how this interacts with compaction when that gets in.
 
   // The end iterator could either point to an unfilled slot in a block, or point to nothing if every block in the
